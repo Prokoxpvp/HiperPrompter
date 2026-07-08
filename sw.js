@@ -1,5 +1,5 @@
 /* Service worker — pełne działanie offline po pierwszym załadowaniu */
-var CACHE = 'teleprompter-v3';
+var CACHE = 'teleprompter-v4';
 var ASSETS = [
   './',
   './index.html',

@@ -36,9 +36,12 @@ var COLORS = {
 };
 var DEFAULT_SETTINGS = {
   fontSize: 44, lineHeight: 1.4, margin: 6, colors: 'wb', font: 'sans',
-  speed: 160, guide: 78, mirror: false, countdown: 3, autoRestart: false
+  speed: 160, guide: 78, mirror: false, countdown: 3, autoRestart: false,
+  fitWords: true
 };
-var SPEED_MIN = 10, SPEED_MAX = 300;
+var SPEED_MIN = 10, SPEED_MAX = 400;
+var FONT_MIN = 24, FONT_MAX = 100;
+var FIT_MIN_SCALE = 0.65; // poniżej 65% ustawionego rozmiaru nie pomniejszamy — słowo się łamie
 
 /* ===================== MAGAZYN (localStorage) ===================== */
 var LS_KEY = 'teleprompter.v1';
@@ -92,17 +95,68 @@ function estimateSeconds(script, widthPx) {
   measurer.style.fontSize = s.fontSize + 'px';
   measurer.style.lineHeight = s.lineHeight;
   measurer.style.fontFamily = FONTS[s.font] || FONTS.sans;
-  measurer.innerHTML = buildContentHTML(script.text);
+  var fit = (s.fitWords === false) ? null : { fontCss: fontCssFor(s, s.fontSize), avail: Math.max(10, textWidth - 2) };
+  measurer.innerHTML = buildContentHTML(script.text, fit);
   var h = measurer.offsetHeight;
   return h / Math.max(1, s.speed);
 }
 
-/* ===================== TREŚĆ + ZNACZNIKI // ===================== */
-function buildContentHTML(text) {
+/* ===================== TREŚĆ + ZNACZNIKI // + DOPASOWANIE SŁÓW ===================== */
+var measureCtx2d = null;
+function getMeasureCtx() {
+  if (!measureCtx2d) measureCtx2d = document.createElement('canvas').getContext('2d');
+  return measureCtx2d;
+}
+function fontCssFor(s, sizePx) {
+  return '600 ' + sizePx + 'px ' + (FONTS[s.font] || FONTS.sans);
+}
+/* kontekst dopasowania: null = funkcja wyłączona */
+function fitCtxFor(widthPx, s) {
+  if (s.fitWords === false || !widthPx) return null;
+  var avail = widthPx * (1 - 2 * s.margin / 100) - 2;
+  if (avail <= 10) return null;
+  return { fontCss: fontCssFor(s, s.fontSize), avail: avail };
+}
+function longestWordWidth(text, fontCss) {
+  var ctx = getMeasureCtx();
+  ctx.font = fontCss;
+  var words = String(text).split(/\s+/), max = 0;
+  for (var i = 0; i < words.length; i++) {
+    if (words[i].length < 3) continue;
+    var w = ctx.measureText(words[i]).width;
+    if (w > max) max = w;
+  }
+  return max;
+}
+
+function buildContentHTML(text, fit) {
   var lines = String(text).replace(/\r\n?/g, '\n').split('\n');
   var html = '', buf = [];
+  var mctx = null;
+  if (fit) { mctx = getMeasureCtx(); mctx.font = fit.fontCss; }
+  function renderLine(line) {
+    if (!mctx) return esc(line);
+    var out = '', tokens = line.split(/(\s+)/);
+    for (var i = 0; i < tokens.length; i++) {
+      var tk = tokens[i];
+      if (!tk) continue;
+      if (/^\s+$/.test(tk)) { out += esc(tk); continue; }
+      var w = mctx.measureText(tk).width;
+      if (w > fit.avail) {
+        var scale = fit.avail / w;
+        if (scale >= FIT_MIN_SCALE) {
+          // pomniejszenie tylko tego słowa, w miejscu — mieści się w jednej linii
+          out += '<span class="fitword" style="font-size:' + (Math.floor(scale * 1000) / 10) + '%">' + esc(tk) + '</span>';
+          continue;
+        }
+        // poniżej progu 65% — zostawiamy standardowe łamanie
+      }
+      out += esc(tk);
+    }
+    return out;
+  }
   function flush() {
-    if (buf.length) { html += '<div class="block">' + esc(buf.join('\n')) + '</div>'; buf = []; }
+    if (buf.length) { html += '<div class="block">' + buf.join('\n') + '</div>'; buf = []; }
   }
   lines.forEach(function (line) {
     if (/^\s*\/\//.test(line)) {
@@ -110,7 +164,7 @@ function buildContentHTML(text) {
       var label = line.replace(/^\s*\/\/\s*/, '');
       html += '<div class="marker" data-marker>' + (label ? esc(label) : '&nbsp;') + '</div>';
     } else {
-      buf.push(line);
+      buf.push(renderLine(line));
     }
   });
   flush();
@@ -302,6 +356,25 @@ function renderPos() {
   elContent.style.transform = 'translate3d(0,' + (-P.pos) + 'px,0)' + mirror;
 }
 
+/* przebudowa treści (dopasowanie długich słów zależy od szerokości, rozmiaru i czcionki) */
+function rebuildContent(keepRel) {
+  if (!P.script) return;
+  var rel = (keepRel && P.maxPos > 0) ? P.pos / P.maxPos : 0;
+  var fit = fitCtxFor(elViewport.clientWidth || window.innerWidth, S());
+  elContent.innerHTML = buildContentHTML(P.script.text, fit);
+  var noMarkers = elContent.querySelectorAll('[data-marker]').length === 0;
+  $('btn-marker-prev').style.display = noMarkers ? 'none' : '';
+  $('btn-marker-next').style.display = noMarkers ? 'none' : '';
+  layout();
+  P.pos = rel * P.maxPos;
+  renderPos();
+}
+var rebuildTimer = null;
+function rebuildContentDebounced() {
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(function () { rebuildContent(true); }, 150);
+}
+
 function updateSpeedUI() {
   var s = S();
   elSlider.value = s.speed;
@@ -452,15 +525,12 @@ function openPrompter(id) {
   P.script = sc;
   sc.lastUsed = Date.now();
   storeSave();
-  elContent.innerHTML = buildContentHTML(sc.text);
   $('prompter-title').textContent = sc.name;
-  var noMarkers = elContent.querySelectorAll('[data-marker]').length === 0;
-  $('btn-marker-prev').style.display = noMarkers ? 'none' : '';
-  $('btn-marker-next').style.display = noMarkers ? 'none' : '';
   P.pos = 0; hideEnd(); cancelCountdown();
   elPrompter.hidden = false;
   document.getElementById('screen-library').hidden = true;
   applySettings();
+  rebuildContent(false);
   syncSettingsUI();
   updateSpeedUI();
   renderPos();
@@ -545,12 +615,7 @@ $('btn-speed-minus').addEventListener('click', function (e) { e.stopPropagation(
 $('btn-speed-plus').addEventListener('click', function (e) { e.stopPropagation(); setSpeed(S().speed + 5); showControls(); });
 
 window.addEventListener('resize', function () {
-  if (!elPrompter.hidden) {
-    var rel = P.maxPos > 0 ? P.pos / P.maxPos : 0;
-    layout();
-    P.pos = rel * P.maxPos;
-    renderPos();
-  }
+  if (!elPrompter.hidden) rebuildContent(true);
 });
 
 /* ===================== PANEL USTAWIEŃ ===================== */
@@ -571,6 +636,7 @@ function syncSettingsUI() {
   $('set-guide').value = s.guide; $('val-guide').textContent = s.guide + '%';
   $('set-mirror').checked = !!s.mirror;
   $('set-autorestart').checked = !!s.autoRestart;
+  $('set-fitwords').checked = s.fitWords !== false;
   segSync('set-colors', 'colors', s.colors, 'data-colors');
   segSync('set-font', 'font', s.font, 'data-font');
   segSync('set-countdown', 'countdown', String(s.countdown), 'data-cd');
@@ -586,6 +652,7 @@ function bindRange(inputId, valId, fn) {
     fn(parseInt(this.value, 10));
     storeSaveDebounced();
     applySettings();
+    rebuildContentDebounced();
     updateSpeedUI();
     syncSettingsUI();
     renderLibraryLater();
@@ -594,7 +661,7 @@ function bindRange(inputId, valId, fn) {
 var libTimer = null;
 function renderLibraryLater() { clearTimeout(libTimer); libTimer = setTimeout(renderLibrary, 800); }
 
-bindRange('set-fontsize', 'val-fontsize', function (v) { S().fontSize = clamp(v, 24, 72); });
+bindRange('set-fontsize', 'val-fontsize', function (v) { S().fontSize = clamp(v, FONT_MIN, FONT_MAX); });
 bindRange('set-lineheight', 'val-lineheight', function (v) { S().lineHeight = clamp(v, 110, 200) / 100; });
 bindRange('set-margin', 'val-margin', function (v) { S().margin = clamp(v, 0, 16); });
 bindRange('set-guide', 'val-guide', function (v) { S().guide = clamp(v, 20, 92); });
@@ -607,7 +674,21 @@ $('set-colors').addEventListener('click', function (e) {
 $('set-font').addEventListener('click', function (e) {
   var b = e.target.closest('button'); if (!b) return;
   S().font = b.getAttribute('data-font');
-  storeSave(); applySettings(); updateSpeedUI(); syncSettingsUI(); renderLibraryLater();
+  storeSave(); applySettings(); rebuildContent(true); updateSpeedUI(); syncSettingsUI(); renderLibraryLater();
+});
+$('set-fitwords').addEventListener('change', function () {
+  S().fitWords = this.checked;
+  storeSave(); rebuildContent(true); updateSpeedUI(); renderLibraryLater();
+});
+$('btn-font-max').addEventListener('click', function () {
+  if (!P.script) return;
+  var s = S();
+  var width = elViewport.clientWidth || window.innerWidth;
+  var avail = width * (1 - 2 * s.margin / 100) - 2;
+  var w100 = longestWordWidth(P.script.text, fontCssFor(s, 100));
+  var fs = w100 > 0 ? Math.floor(100 * avail / w100) : FONT_MAX;
+  s.fontSize = clamp(fs, FONT_MIN, FONT_MAX);
+  storeSave(); applySettings(); rebuildContent(true); updateSpeedUI(); syncSettingsUI(); renderLibraryLater();
 });
 $('set-countdown').addEventListener('click', function (e) {
   var b = e.target.closest('button'); if (!b) return;
@@ -716,17 +797,20 @@ function handleRemoteCmd(d) {
 function remoteAdj(key, delta) {
   var s = S();
   delta = Number(delta) || 0;
-  if (key === 'fontSize') s.fontSize = clamp(s.fontSize + delta, 24, 72);
+  if (key === 'fontSize') s.fontSize = clamp(s.fontSize + delta, FONT_MIN, FONT_MAX);
   else if (key === 'lineHeight') s.lineHeight = Math.round(clamp(s.lineHeight + delta, 1.1, 2.0) * 100) / 100;
   else if (key === 'guide') s.guide = clamp(s.guide + delta, 20, 92);
   else return;
-  storeSaveDebounced(); applySettings(); syncSettingsUI(); updateSpeedUI();
+  storeSaveDebounced(); applySettings();
+  if (key === 'fontSize') rebuildContent(true);
+  syncSettingsUI(); updateSpeedUI();
 }
 
 function remoteSet(key, value) {
   var s = S();
   if (key === 'colors' && COLORS[value]) s.colors = value;
   else if (key === 'font' && FONTS[value]) s.font = value;
+  else if (key === 'fitWords') s.fitWords = !!value;
   else if (key === 'mirror') s.mirror = !!value;
   else if (key === 'autoRestart') {
     s.autoRestart = !!value;
@@ -736,7 +820,9 @@ function remoteSet(key, value) {
     }
   }
   else return;
-  storeSave(); applySettings(); renderPos(); syncSettingsUI(); updateSpeedUI();
+  storeSave(); applySettings();
+  if (key === 'font' || key === 'fitWords') rebuildContent(true);
+  renderPos(); syncSettingsUI(); updateSpeedUI();
 }
 
 function remoteSendState() {
@@ -751,7 +837,8 @@ function remoteSendState() {
     counting: !elCountdown.hidden,
     settings: {
       fontSize: s.fontSize, lineHeight: s.lineHeight, guide: s.guide,
-      colors: s.colors, font: s.font, mirror: !!s.mirror, autoRestart: !!s.autoRestart
+      colors: s.colors, font: s.font, mirror: !!s.mirror, autoRestart: !!s.autoRestart,
+      fitWords: s.fitWords !== false
     }
   };
   host.conns.forEach(function (c) { try { c.send(msg); } catch (e) {} });
@@ -853,6 +940,7 @@ function rcOnData(d) {
       rcSegMark('rcs-font', 'data-font', d.settings.font);
       $('rcs-mirror').checked = !!d.settings.mirror;
       $('rcs-autorestart').checked = !!d.settings.autoRestart;
+      $('rcs-fitwords').checked = d.settings.fitWords !== false;
     }
   } else if (d.t === 'bye') {
     rcStatus('Prompter zamknięty na drugim telefonie', 'err');
@@ -887,6 +975,7 @@ $('rcs-font').addEventListener('click', function (e) {
 });
 $('rcs-mirror').addEventListener('change', function () { rcSendObj({ t: 'cmd', cmd: 'set', key: 'mirror', value: this.checked }); });
 $('rcs-autorestart').addEventListener('change', function () { rcSendObj({ t: 'cmd', cmd: 'set', key: 'autoRestart', value: this.checked }); });
+$('rcs-fitwords').addEventListener('change', function () { rcSendObj({ t: 'cmd', cmd: 'set', key: 'fitWords', value: this.checked }); });
 
 /* ===================== BANNER INSTALACJI ===================== */
 var deferredInstall = null;

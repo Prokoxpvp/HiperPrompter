@@ -294,6 +294,8 @@ button { font-family: inherit; }
   width: 100%; min-height: 52px; border-radius: 12px; cursor: pointer;
   background: var(--bg-item); border: 1px solid var(--border); color: #fff; font-size: 15px;
 }
+#btn-font-max { margin-top: 8px; }
+#prompter-content .fitword { display: inline-block; max-width: 100%; }
 
 /* ========== REMOTE (host panel + controller screen) ========== */
 #remote-panel {

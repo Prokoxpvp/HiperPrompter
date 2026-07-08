@@ -75,7 +75,7 @@
   <div class="p-controls" id="controls-bottom">
     <div class="ctrl-row">
       <button class="pbtn" id="btn-speed-minus" type="button" aria-label="Wolniej">−</button>
-      <input type="range" id="speed-slider" min="10" max="300" step="1" aria-label="Prędkość">
+      <input type="range" id="speed-slider" min="10" max="400" step="1" aria-label="Prędkość">
       <button class="pbtn" id="btn-speed-plus" type="button" aria-label="Szybciej">+</button>
       <div id="speed-label">60 px/s</div>
     </div>
@@ -117,7 +117,8 @@
 
     <div class="set-row">
       <div class="lbl"><span>Rozmiar tekstu</span><span class="val" id="val-fontsize">44 px</span></div>
-      <input type="range" id="set-fontsize" min="24" max="72" step="1">
+      <input type="range" id="set-fontsize" min="24" max="100" step="1">
+      <button class="btn-block" id="btn-font-max" type="button">⤢ Maks. rozmiar bez łamania słów</button>
     </div>
 
     <div class="set-row">
@@ -153,6 +154,11 @@
         <button data-font="serif" type="button" style="font-family:Georgia,serif">Serif</button>
         <button data-font="legible" type="button" style="font-family:Verdana,sans-serif">Czytelna</button>
       </div>
+    </div>
+
+    <div class="toggle-row">
+      <span>Nie łam długich słów (pomniejszaj do 65%)</span>
+      <input type="checkbox" id="set-fitwords">
     </div>
 
     <hr class="set-sep">
@@ -247,6 +253,7 @@
       </div>
       <div class="toggle-row"><span>Odbicie lustrzane</span><input type="checkbox" id="rcs-mirror"></div>
       <div class="toggle-row"><span>Auto-restart po końcu</span><input type="checkbox" id="rcs-autorestart"></div>
+      <div class="toggle-row"><span>Nie łam długich słów</span><input type="checkbox" id="rcs-fitwords"></div>
     </div>
   </div>
 
