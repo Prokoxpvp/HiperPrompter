@@ -36,8 +36,9 @@ var COLORS = {
 };
 var DEFAULT_SETTINGS = {
   fontSize: 44, lineHeight: 1.4, margin: 6, colors: 'wb', font: 'sans',
-  speed: 60, guide: 78, mirror: false, countdown: 3, autoRestart: false
+  speed: 160, guide: 78, mirror: false, countdown: 3, autoRestart: false
 };
+var SPEED_MIN = 10, SPEED_MAX = 300;
 
 /* ===================== MAGAZYN (localStorage) ===================== */
 var LS_KEY = 'teleprompter.v1';
@@ -51,9 +52,15 @@ function storeLoad() {
       if (parsed && Array.isArray(parsed.scripts)) store = parsed;
     }
   } catch (e) { /* uszkodzone dane — start od zera */ }
+  var migrated = false;
   store.scripts.forEach(function (s) {
     s.settings = Object.assign({}, DEFAULT_SETTINGS, s.settings || {});
+    // normalizacja po zmianach wersji: odliczanie tylko 0/3/5, prędkość w nowym zakresie
+    if ([0, 3, 5].indexOf(s.settings.countdown) === -1) { s.settings.countdown = 3; migrated = true; }
+    var sp = clamp(s.settings.speed, SPEED_MIN, SPEED_MAX);
+    if (sp !== s.settings.speed) { s.settings.speed = sp; migrated = true; }
   });
+  if (migrated) storeSave();
 }
 function storeSave() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(store)); }
@@ -322,9 +329,13 @@ function tick(t) {
   P.rafId = requestAnimationFrame(tick);
 }
 
+function showStartOverlay() { $('start-overlay').hidden = false; }
+function hideStartOverlay() { $('start-overlay').hidden = true; }
+
 function play() {
   if (P.playing || !P.script) return;
   hideEnd();
+  hideStartOverlay();
   P.playing = true;
   P.lastT = 0;
   elPlayPause.textContent = '⏸';
@@ -343,6 +354,7 @@ function pause() {
 function togglePlay() { P.playing ? pause() : startWithCountdownIfAtTop(); }
 
 function startWithCountdownIfAtTop() {
+  hideStartOverlay();
   if (P.pos <= 1) startCountdown(play);
   else play();
 }
@@ -350,7 +362,7 @@ function startWithCountdownIfAtTop() {
 function restart(withCountdown) {
   cancelCountdown();
   pause();
-  P.pos = 0; renderPos(); hideEnd();
+  P.pos = 0; renderPos(); hideEnd(); hideStartOverlay();
   if (withCountdown !== false) startCountdown(play);
   remoteSendState();
 }
@@ -375,7 +387,8 @@ function hideEnd() { P.endShown = false; elEnd.hidden = true; }
 /* odliczanie */
 function startCountdown(cb) {
   cancelCountdown();
-  var n = S().countdown || 3;
+  var n = S().countdown;
+  if (!n || n <= 0) { cb(); return; } // odliczanie 0 s — start natychmiast
   elCountNum.textContent = n;
   elCountdown.hidden = false;
   P.countdownTimer = setInterval(function () {
@@ -460,11 +473,11 @@ function openPrompter(id) {
       document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
     }
   } catch (e) {}
-  startCountdown(play);
+  showStartOverlay(); // tekst wstrzymany — start dopiero po naciśnięciu dużego przycisku
 }
 
 function closePrompter() {
-  pause(); cancelCountdown(); hideEnd();
+  pause(); cancelCountdown(); hideEnd(); hideStartOverlay();
   wake.off();
   remoteHostSendBye();
   try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {}); } catch (e) {}
@@ -478,9 +491,28 @@ function closePrompter() {
 
 /* zdarzenia prompteru */
 elViewport.addEventListener('click', function () {
-  if (!elCountdown.hidden || !elEnd.hidden) return;
+  if (!elCountdown.hidden || !elEnd.hidden || !$('start-overlay').hidden) return;
   if (P.playing) { pause(); }
   else { showControls(true); startWithCountdownIfAtTop(); }
+});
+$('btn-start-go').addEventListener('click', function (e) {
+  e.stopPropagation();
+  hideStartOverlay();
+  startCountdown(play);
+});
+$('btn-start-settings').addEventListener('click', function (e) {
+  e.stopPropagation();
+  syncSettingsUI();
+  $('settings-panel').hidden = false;
+});
+$('btn-start-remote').addEventListener('click', function (e) {
+  e.stopPropagation();
+  openRemotePanel();
+});
+$('btn-remote-quick').addEventListener('click', function (e) {
+  e.stopPropagation();
+  pause();
+  openRemotePanel();
 });
 $('btn-exit').addEventListener('click', function (e) { e.stopPropagation(); closePrompter(); });
 elPlayPause.addEventListener('click', function (e) { e.stopPropagation(); togglePlay(); });
@@ -498,7 +530,7 @@ $('chk-auto-restart').addEventListener('change', function () {
 
 function setSpeed(v) {
   var s = S();
-  s.speed = clamp(Math.round(v), 10, 240);
+  s.speed = clamp(Math.round(v), SPEED_MIN, SPEED_MAX);
   storeSaveDebounced();
   updateSpeedUI();
 }
@@ -675,19 +707,52 @@ function handleRemoteCmd(d) {
     case 'slower': setSpeed(S().speed - 5); break;
     case 'next': jumpMarker(1); break;
     case 'prev': jumpMarker(-1); break;
+    case 'adj': remoteAdj(d.key, d.delta); break;
+    case 'set': remoteSet(d.key, d.value); break;
   }
   showControls();
 }
 
+function remoteAdj(key, delta) {
+  var s = S();
+  delta = Number(delta) || 0;
+  if (key === 'fontSize') s.fontSize = clamp(s.fontSize + delta, 24, 72);
+  else if (key === 'lineHeight') s.lineHeight = Math.round(clamp(s.lineHeight + delta, 1.1, 2.0) * 100) / 100;
+  else if (key === 'guide') s.guide = clamp(s.guide + delta, 20, 92);
+  else return;
+  storeSaveDebounced(); applySettings(); syncSettingsUI(); updateSpeedUI();
+}
+
+function remoteSet(key, value) {
+  var s = S();
+  if (key === 'colors' && COLORS[value]) s.colors = value;
+  else if (key === 'font' && FONTS[value]) s.font = value;
+  else if (key === 'mirror') s.mirror = !!value;
+  else if (key === 'autoRestart') {
+    s.autoRestart = !!value;
+    $('chk-auto-restart').checked = s.autoRestart;
+    if (s.autoRestart && P.endShown) {
+      setTimeout(function () { if (P.endShown && P.script) restart(true); }, 800);
+    }
+  }
+  else return;
+  storeSave(); applySettings(); renderPos(); syncSettingsUI(); updateSpeedUI();
+}
+
 function remoteSendState() {
   if (!host.conns.length || !P.script) return;
+  var s = S();
   var msg = {
     t: 'state',
     playing: P.playing,
-    speed: S().speed,
+    speed: s.speed,
     progress: P.maxPos > 0 ? P.pos / P.maxPos : 0,
     name: P.script.name,
-    counting: !elCountdown.hidden
+    counting: !elCountdown.hidden,
+    settings: {
+      fontSize: s.fontSize, lineHeight: s.lineHeight, guide: s.guide,
+      colors: s.colors, font: s.font, mirror: !!s.mirror, autoRestart: !!s.autoRestart
+    }
   };
   host.conns.forEach(function (c) { try { c.send(msg); } catch (e) {} });
 }
@@ -766,6 +831,13 @@ function rcConnect(code) {
   });
 }
 
+function rcSegMark(containerId, attr, val) {
+  var btns = $(containerId).querySelectorAll('button');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('on', btns[i].getAttribute(attr) === String(val));
+  }
+}
+
 function rcOnData(d) {
   if (!d) return;
   if (d.t === 'state') {
@@ -773,6 +845,15 @@ function rcOnData(d) {
     $('remote-progress').querySelector('.bar').style.width = Math.round((d.progress || 0) * 100) + '%';
     $('rc-speed-val').textContent = 'Prędkość: ' + d.speed + ' px/s';
     $('rc-toggle').textContent = d.counting ? '⏳ Odliczanie…' : (d.playing ? '⏸ Pauza' : '▶ Start');
+    if (d.settings) {
+      $('rcs-fs-val').textContent = d.settings.fontSize + ' px';
+      $('rcs-lh-val').textContent = Number(d.settings.lineHeight).toFixed(2);
+      $('rcs-guide-val').textContent = d.settings.guide + '%';
+      rcSegMark('rcs-colors', 'data-colors', d.settings.colors);
+      rcSegMark('rcs-font', 'data-font', d.settings.font);
+      $('rcs-mirror').checked = !!d.settings.mirror;
+      $('rcs-autorestart').checked = !!d.settings.autoRestart;
+    }
   } else if (d.t === 'bye') {
     rcStatus('Prompter zamknięty na drugim telefonie', 'err');
   }
@@ -786,6 +867,26 @@ $('rc-faster').addEventListener('click', function () { rcSend('faster'); });
 $('rc-slower').addEventListener('click', function () { rcSend('slower'); });
 $('rc-next').addEventListener('click', function () { rcSend('next'); });
 $('rc-prev').addEventListener('click', function () { rcSend('prev'); });
+
+function rcSendObj(obj) {
+  if (rc.conn && rc.conn.open) { try { rc.conn.send(obj); } catch (e) {} }
+}
+$('rcs-fs-minus').addEventListener('click', function () { rcSendObj({ t: 'cmd', cmd: 'adj', key: 'fontSize', delta: -2 }); });
+$('rcs-fs-plus').addEventListener('click', function () { rcSendObj({ t: 'cmd', cmd: 'adj', key: 'fontSize', delta: 2 }); });
+$('rcs-lh-minus').addEventListener('click', function () { rcSendObj({ t: 'cmd', cmd: 'adj', key: 'lineHeight', delta: -0.05 }); });
+$('rcs-lh-plus').addEventListener('click', function () { rcSendObj({ t: 'cmd', cmd: 'adj', key: 'lineHeight', delta: 0.05 }); });
+$('rcs-guide-minus').addEventListener('click', function () { rcSendObj({ t: 'cmd', cmd: 'adj', key: 'guide', delta: -2 }); });
+$('rcs-guide-plus').addEventListener('click', function () { rcSendObj({ t: 'cmd', cmd: 'adj', key: 'guide', delta: 2 }); });
+$('rcs-colors').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  rcSendObj({ t: 'cmd', cmd: 'set', key: 'colors', value: b.getAttribute('data-colors') });
+});
+$('rcs-font').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  rcSendObj({ t: 'cmd', cmd: 'set', key: 'font', value: b.getAttribute('data-font') });
+});
+$('rcs-mirror').addEventListener('change', function () { rcSendObj({ t: 'cmd', cmd: 'set', key: 'mirror', value: this.checked }); });
+$('rcs-autorestart').addEventListener('change', function () { rcSendObj({ t: 'cmd', cmd: 'set', key: 'autoRestart', value: this.checked }); });
 
 /* ===================== BANNER INSTALACJI ===================== */
 var deferredInstall = null;

@@ -75,7 +75,7 @@
   <div class="p-controls" id="controls-bottom">
     <div class="ctrl-row">
       <button class="pbtn" id="btn-speed-minus" type="button" aria-label="Wolniej">−</button>
-      <input type="range" id="speed-slider" min="10" max="240" step="1" aria-label="Prędkość">
+      <input type="range" id="speed-slider" min="10" max="300" step="1" aria-label="Prędkość">
       <button class="pbtn" id="btn-speed-plus" type="button" aria-label="Szybciej">+</button>
       <div id="speed-label">60 px/s</div>
     </div>
@@ -83,8 +83,17 @@
       <button class="pbtn" id="btn-restart" type="button" aria-label="Od początku">↺</button>
       <button class="pbtn" id="btn-marker-prev" type="button" aria-label="Poprzednia sekcja">«</button>
       <button class="pbtn" id="btn-marker-next" type="button" aria-label="Następna sekcja">»</button>
+      <button class="pbtn" id="btn-remote-quick" type="button" aria-label="Pilot">📱</button>
       <div class="ctrl-spacer"></div>
       <button class="pbtn pbtn-accent pbtn-big" id="btn-playpause" type="button" aria-label="Start / pauza">▶</button>
+    </div>
+  </div>
+
+  <div id="start-overlay" hidden>
+    <button id="btn-start-go" type="button">▶ Start</button>
+    <div class="start-row">
+      <button class="btn-ghost" id="btn-start-settings" type="button">⚙ Ustawienia tekstu</button>
+      <button class="btn-ghost" id="btn-start-remote" type="button">📱 Pilot</button>
     </div>
   </div>
 
@@ -151,9 +160,9 @@
     <div class="set-row">
       <div class="lbl"><span>Odliczanie przed startem</span></div>
       <div class="seg" id="set-countdown">
+        <button data-cd="0" type="button">Bez</button>
         <button data-cd="3" type="button">3 s</button>
         <button data-cd="5" type="button">5 s</button>
-        <button data-cd="10" type="button">10 s</button>
       </div>
     </div>
 
@@ -169,7 +178,7 @@
 
     <hr class="set-sep">
 
-    <button class="btn-block" id="btn-open-remote" type="button">📱 Pilot — steruj z drugiego telefonu</button>
+    <button class="btn-block" id="btn-open-remote" type="button">📱 Pilot: Steruj z drugiego telefonu</button>
   </div>
 
   <!-- REMOTE HOST PANEL (QR) -->
@@ -211,6 +220,33 @@
         <button class="rc-btn" id="rc-next" type="button">sekcja »</button>
       </div>
       <button class="rc-btn" id="rc-restart" type="button">↺ Od początku</button>
+
+      <hr class="set-sep">
+
+      <div class="rc-set"><span>Rozmiar tekstu</span>
+        <div class="rc-adj"><button class="rc-mini" id="rcs-fs-minus" type="button">−</button><span id="rcs-fs-val">–</span><button class="rc-mini" id="rcs-fs-plus" type="button">+</button></div>
+      </div>
+      <div class="rc-set"><span>Interlinia</span>
+        <div class="rc-adj"><button class="rc-mini" id="rcs-lh-minus" type="button">−</button><span id="rcs-lh-val">–</span><button class="rc-mini" id="rcs-lh-plus" type="button">+</button></div>
+      </div>
+      <div class="rc-set"><span>Linia czytania</span>
+        <div class="rc-adj"><button class="rc-mini" id="rcs-guide-minus" type="button">−</button><span id="rcs-guide-val">–</span><button class="rc-mini" id="rcs-guide-plus" type="button">+</button></div>
+      </div>
+      <div class="rc-set"><span>Kolory</span></div>
+      <div class="swatches" id="rcs-colors">
+        <button class="swatch" data-colors="wb" style="background:#000;color:#fff" type="button">Aa</button>
+        <button class="swatch" data-colors="yb" style="background:#000;color:#ffd400" type="button">Aa</button>
+        <button class="swatch" data-colors="gb" style="background:#000;color:#7dff7d" type="button">Aa</button>
+        <button class="swatch" data-colors="bw" style="background:#fff;color:#000" type="button">Aa</button>
+      </div>
+      <div class="rc-set"><span>Czcionka</span></div>
+      <div class="seg" id="rcs-font">
+        <button data-font="sans" type="button">Sans</button>
+        <button data-font="serif" type="button" style="font-family:Georgia,serif">Serif</button>
+        <button data-font="legible" type="button" style="font-family:Verdana,sans-serif">Czytelna</button>
+      </div>
+      <div class="toggle-row"><span>Odbicie lustrzane</span><input type="checkbox" id="rcs-mirror"></div>
+      <div class="toggle-row"><span>Auto-restart po końcu</span><input type="checkbox" id="rcs-autorestart"></div>
     </div>
   </div>
 

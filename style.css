@@ -212,6 +212,22 @@ button { font-family: inherit; }
 #countdown-num { font-size: 38vmin; font-weight: 800; color: var(--accent); line-height: 1; }
 #countdown-overlay .sub { color: var(--muted); font-size: 15px; }
 
+/* Start overlay */
+#start-overlay {
+  position: absolute; inset: 0; z-index: 18;
+  background: rgba(0,0,0,.82);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  padding: 24px;
+}
+#btn-start-go {
+  background: var(--accent); color: #000; border: none;
+  border-radius: 20px; font-size: 26px; font-weight: 800;
+  padding: 28px 44px; cursor: pointer; min-height: 88px;
+  width: min(90%, 420px);
+}
+#start-overlay .start-row { display: flex; gap: 12px; width: min(90%, 420px); }
+#start-overlay .start-row .btn-ghost { flex: 1; }
+
 /* End overlay */
 #end-overlay {
   position: absolute; inset: 0; z-index: 20;
@@ -300,7 +316,23 @@ button { font-family: inherit; }
   display: flex; flex-direction: column;
   padding: calc(14px + var(--safe-top)) 18px calc(20px + var(--safe-bottom));
   max-width: 480px; margin: 0 auto;
+  overflow-y: auto;
 }
+.rc-set {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 52px; color: #d5d5dd; font-size: 15px;
+}
+.rc-adj { display: flex; align-items: center; gap: 8px; }
+.rc-adj .rc-mini {
+  width: 48px; height: 48px; border-radius: 12px; cursor: pointer;
+  background: var(--bg-item); border: 1px solid var(--border); color: #fff; font-size: 20px;
+}
+.rc-adj span {
+  min-width: 52px; text-align: center; color: var(--accent);
+  font-variant-numeric: tabular-nums; font-size: 15px;
+}
+#screen-remote .toggle-row { color: #d5d5dd; }
+#screen-remote .swatches .swatch { min-height: 48px; }
 #screen-remote h1 { font-size: 18px; margin: 0 0 4px; }
 #remote-conn-status { font-size: 14px; color: var(--muted); margin-bottom: 14px; }
 #remote-conn-status.ok { color: #6ee76e; }
