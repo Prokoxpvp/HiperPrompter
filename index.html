@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Teleprompter">
+  <title>Teleprompter</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ SCREEN 1: SCRIPT LIBRARY ============ -->
+<main id="screen-library">
+  <div class="lib-header">
+    <div>
+      <h1>Teleprompter</h1>
+      <div class="subtitle">Wybierz skrypt i naciśnij ▶</div>
+    </div>
+    <button class="btn-ghost" id="btn-remote-mode" type="button">Pilot</button>
+  </div>
+
+  <div id="script-list"></div>
+
+  <div id="empty-state" hidden>
+    <div class="big">🎬</div>
+    <p><strong>Brak skryptów.</strong><br>
+    Naciśnij „+ Nowy skrypt", wklej tekst<br>i zacznij nagrywać.</p>
+  </div>
+
+  <button id="btn-new" type="button">+ Nowy skrypt</button>
+
+  <div id="install-banner" hidden>
+    <div class="txt" id="install-text"></div>
+    <button class="btn-install" id="btn-install" type="button" hidden>Zainstaluj</button>
+    <button class="btn-close" id="btn-install-close" type="button" aria-label="Zamknij">✕</button>
+  </div>
+</main>
+
+<!-- ============ EDITOR OVERLAY ============ -->
+<div id="editor" hidden>
+  <div class="row">
+    <input type="text" id="editor-name" placeholder="Nazwa skryptu" autocomplete="off">
+  </div>
+  <textarea id="editor-text" placeholder="Wklej lub wpisz tekst do czytania…&#10;&#10;Wskazówka: linia zaczynająca się od // stanie się znacznikiem sekcji, np.:&#10;// Wstęp"></textarea>
+  <p class="hint">Linia zaczynająca się od <strong>//</strong> to znacznik sekcji — w prompterze pojawi się jako pozioma przerwa, między którą można skakać przyciskami « ».</p>
+  <div class="actions">
+    <button class="btn-cancel" id="btn-editor-cancel" type="button">Anuluj</button>
+    <button class="btn-danger" id="btn-editor-delete" type="button" hidden>Usuń</button>
+    <button class="btn-cancel" id="btn-editor-duplicate" type="button" hidden>Duplikuj</button>
+    <button class="btn-save" id="btn-editor-save" type="button">Zapisz</button>
+  </div>
+</div>
+
+<!-- ============ SCREEN 2: PROMPTER ============ -->
+<div id="screen-prompter" hidden>
+  <div id="prompter-viewport">
+    <div id="prompter-content"></div>
+  </div>
+  <div id="guide-line"></div>
+
+  <div class="p-controls" id="controls-top">
+    <button class="pbtn" id="btn-exit" type="button" aria-label="Wróć do listy">←</button>
+    <div class="title" id="prompter-title"></div>
+    <div class="esttime" id="prompter-esttime"></div>
+    <button class="pbtn" id="btn-settings" type="button" aria-label="Ustawienia">⚙</button>
+  </div>
+
+  <div class="p-controls" id="controls-bottom">
+    <div class="ctrl-row">
+      <button class="pbtn" id="btn-speed-minus" type="button" aria-label="Wolniej">−</button>
+      <input type="range" id="speed-slider" min="10" max="240" step="1" aria-label="Prędkość">
+      <button class="pbtn" id="btn-speed-plus" type="button" aria-label="Szybciej">+</button>
+      <div id="speed-label">60 px/s</div>
+    </div>
+    <div class="ctrl-row">
+      <button class="pbtn" id="btn-restart" type="button" aria-label="Od początku">↺</button>
+      <button class="pbtn" id="btn-marker-prev" type="button" aria-label="Poprzednia sekcja">«</button>
+      <button class="pbtn" id="btn-marker-next" type="button" aria-label="Następna sekcja">»</button>
+      <div class="ctrl-spacer"></div>
+      <button class="pbtn pbtn-accent pbtn-big" id="btn-playpause" type="button" aria-label="Start / pauza">▶</button>
+    </div>
+  </div>
+
+  <div id="countdown-overlay" hidden>
+    <div id="countdown-num">3</div>
+    <div class="sub">Dotknij, aby anulować</div>
+  </div>
+
+  <div id="end-overlay" hidden>
+    <button id="btn-again" type="button">▶ Od początku</button>
+    <label><input type="checkbox" id="chk-auto-restart"> Auto-restart po dojechaniu do końca</label>
+    <button class="btn-ghost" id="btn-end-exit" type="button">Lista skryptów</button>
+  </div>
+
+  <!-- SETTINGS SHEET -->
+  <div id="settings-panel" hidden>
+    <div class="sheet-head">
+      <h2>Ustawienia (zapisywane dla tego skryptu)</h2>
+      <button class="btn-close-sheet" id="btn-settings-close" type="button" aria-label="Zamknij">✕</button>
+    </div>
+
+    <div class="set-row">
+      <div class="lbl"><span>Rozmiar tekstu</span><span class="val" id="val-fontsize">44 px</span></div>
+      <input type="range" id="set-fontsize" min="24" max="72" step="1">
+    </div>
+
+    <div class="set-row">
+      <div class="lbl"><span>Interlinia</span><span class="val" id="val-lineheight">1.40</span></div>
+      <input type="range" id="set-lineheight" min="110" max="200" step="5">
+    </div>
+
+    <div class="set-row">
+      <div class="lbl"><span>Marginesy boczne</span><span class="val" id="val-margin">6%</span></div>
+      <input type="range" id="set-margin" min="0" max="16" step="1">
+    </div>
+
+    <div class="set-row">
+      <div class="lbl"><span>Linia czytania (pozycja)</span><span class="val" id="val-guide">78%</span></div>
+      <input type="range" id="set-guide" min="20" max="92" step="1">
+      <p class="tiny-note">Im niżej, tym wzrok czytającego jest bliżej obiektywu (telefon nad kamerą).</p>
+    </div>
+
+    <div class="set-row">
+      <div class="lbl"><span>Kolory</span></div>
+      <div class="swatches" id="set-colors">
+        <button class="swatch" data-colors="wb" style="background:#000;color:#fff" type="button">Aa</button>
+        <button class="swatch" data-colors="yb" style="background:#000;color:#ffd400" type="button">Aa</button>
+        <button class="swatch" data-colors="gb" style="background:#000;color:#7dff7d" type="button">Aa</button>
+        <button class="swatch" data-colors="bw" style="background:#fff;color:#000" type="button">Aa</button>
+      </div>
+    </div>
+
+    <div class="set-row">
+      <div class="lbl"><span>Czcionka</span></div>
+      <div class="seg" id="set-font">
+        <button data-font="sans" type="button">Sans</button>
+        <button data-font="serif" type="button" style="font-family:Georgia,serif">Serif</button>
+        <button data-font="legible" type="button" style="font-family:Verdana,sans-serif">Czytelna</button>
+      </div>
+    </div>
+
+    <hr class="set-sep">
+
+    <div class="set-row">
+      <div class="lbl"><span>Odliczanie przed startem</span></div>
+      <div class="seg" id="set-countdown">
+        <button data-cd="3" type="button">3 s</button>
+        <button data-cd="5" type="button">5 s</button>
+        <button data-cd="10" type="button">10 s</button>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <span>Odbicie lustrzane (teleprompter szklany)</span>
+      <input type="checkbox" id="set-mirror">
+    </div>
+
+    <div class="toggle-row">
+      <span>Auto-restart po końcu (kolejne ujęcie)</span>
+      <input type="checkbox" id="set-autorestart">
+    </div>
+
+    <hr class="set-sep">
+
+    <button class="btn-block" id="btn-open-remote" type="button">📱 Pilot — steruj z drugiego telefonu</button>
+  </div>
+
+  <!-- REMOTE HOST PANEL (QR) -->
+  <div id="remote-panel" hidden>
+    <div class="sheet-head">
+      <h2>Pilot zdalny</h2>
+      <button class="btn-close-sheet" id="btn-remote-close" type="button" aria-label="Zamknij">✕</button>
+    </div>
+    <p class="tiny-note">Zeskanuj kod QR aparatem drugiego telefonu<br>albo otwórz aplikację, wybierz „Pilot" i wpisz kod.</p>
+    <div id="remote-qr"></div>
+    <div id="remote-code"></div>
+    <div id="remote-status">Łączenie…</div>
+    <p class="tiny-note">Pilot wymaga internetu na obu telefonach.<br>Prompter działa normalnie także bez pilota.</p>
+  </div>
+</div>
+
+<!-- ============ REMOTE CONTROLLER (second phone) ============ -->
+<div id="screen-remote" hidden>
+  <h1>🎛 Pilot teleprompteru</h1>
+  <div id="remote-conn-status">Nie połączono</div>
+
+  <div id="remote-pair-box">
+    <input type="text" id="remote-code-input" placeholder="KOD" maxlength="6" autocomplete="off" autocapitalize="characters">
+    <button class="rc-btn" id="btn-remote-connect" type="button">Połącz</button>
+  </div>
+
+  <div id="remote-controls" hidden>
+    <div id="remote-script-name"></div>
+    <div id="remote-progress"><div class="bar"></div></div>
+    <div class="rc-grid">
+      <button class="rc-btn" id="rc-toggle" type="button">▶ Start</button>
+      <div class="rc-row">
+        <button class="rc-btn" id="rc-slower" type="button">− wolniej</button>
+        <button class="rc-btn" id="rc-faster" type="button">+ szybciej</button>
+      </div>
+      <div id="rc-speed-val"></div>
+      <div class="rc-row">
+        <button class="rc-btn" id="rc-prev" type="button">« sekcja</button>
+        <button class="rc-btn" id="rc-next" type="button">sekcja »</button>
+      </div>
+      <button class="rc-btn" id="rc-restart" type="button">↺ Od początku</button>
+    </div>
+  </div>
+
+  <button class="btn-ghost" id="btn-remote-exit" type="button" style="margin-top:14px">← Wyjdź z pilota</button>
+</div>
+
+<script src="qr.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
