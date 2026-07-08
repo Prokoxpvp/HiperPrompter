@@ -2,7 +2,7 @@
 
 Teleprompter na telefon dla osób nagrywanych do kamery. Działa na iPhonie i Androidzie, **za darmo i bez instalacji**. Po pierwszym otwarciu działa także **offline**.
 
-Telefon z teleprompterem montujesz w uchwycie **nad obiektywem kamery** — linia czytania jest domyślnie blisko dolnej krawędzi ekranu, więc wzrok osoby czytającej pozostaje blisko obiektywu.
+Telefon z teleprompterem montujesz w uchwycie **nad obiektywem kamery**, linia czytania jest domyślnie blisko dolnej krawędzi ekranu, więc wzrok osoby czytającej pozostaje blisko obiektywu.
 
 Nic nie muszisz instalować, link otwiera się w przeglądarce. Warto jednak dodać aplikację do ekranu głównego (pełny ekran, działa offline):
 
