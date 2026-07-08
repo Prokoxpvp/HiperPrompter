@@ -41,10 +41,6 @@ Nic nie muszisz instalować, link otwiera się w przeglądarce. Warto jednak dod
 - **Pilot zdalny**: w ustawieniach prompteru wybierz „Pilot", zeskanuj kod QR drugim telefonem - możesz startować, pauzować i zmieniać prędkość zza kamery. Pilot wymaga internetu na obu telefonach; bez niego aplikacja działa normalnie.
 - **Szacowany czas czytania** przy każdym skrypcie, przeliczany według aktualnej prędkości.
 
-## Aktualizacja aplikacji
-
-Gdy dostaniesz nowe wersje plików: wejdź do repozytorium na GitHub → **Add file → Upload files** → wgraj nowe pliki (nadpiszą stare) → **Commit changes**. Telefony pobiorą nową wersję przy najbliższym otwarciu z internetem.
-
 ## Prywatność
 
 Wszystkie skrypty i ustawienia są zapisywane **wyłącznie w pamięci telefonu** (localStorage). Aplikacja nie ma kont, serwera ani statystyk. Uwaga: wyczyszczenie danych przeglądarki usuwa też skrypty.
